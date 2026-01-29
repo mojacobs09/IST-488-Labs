@@ -36,12 +36,12 @@ if uploaded_file and question:
 
     )
 # check box make the user select the higher model
-    use_advance = st.checkbox('Use Advanced Model')
+use_advance = st.checkbox('Use Advanced Model')
 
-    if use_advance:
-        model_name = 'gpt-5-mini'
-    else: 
-        model_name = "gpt-5.1"
+if use_advance:
+    model_name = 'gpt-5-mini'
+else: 
+    model_name = "gpt-5.1"
 
 
     # Generate an answer using the OpenAI API.
