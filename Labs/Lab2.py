@@ -45,8 +45,14 @@ else:
 
 
     # Generate an answer using the OpenAI API.
+    messages = [
+        {"role": "user",
+        "content": "Your prompt here"}
+    ]
+
+    
     stream = client.chat.completions.create(
-        model="gpt-5-chat-latest",
+        model= model_name,
         messages=messages,
         stream=True,
     )
