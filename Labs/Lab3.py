@@ -13,7 +13,7 @@ else:
 
 #create an opem AI client
 
-if 'client' not in st.session.state:
+if 'client' not in st.session_state:
     api_key = st.secrets ['OPENAI_API_KEY']
     st.session_state.client = OpenAI(api_key=api_key)
 
