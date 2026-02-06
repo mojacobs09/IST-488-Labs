@@ -25,28 +25,29 @@ If the user says yes, provide more detailed information and ask again.
 If the user says no, ask "What else can I help you with?"'''},
         {'role': 'assistant', 'content': 'How can I help you?'}
     ]
+
 for msg in st.session_state.messages:
-    if msg['role'] != 'system':  # Don't show system message
+    if msg['role'] != 'system':
         chat_msg = st.chat_message(msg['role'])
         chat_msg.write(msg['content'])
 
 if prompt := st.chat_input('What is up?'):
-    st.session_statemessages.append({'role': 'user', 'content': prompt})
-
-with st.chat_message('user'):
-     st.markdown(prompt)
-
-client = st.session_state.client
-stream = client.chat.completions.create(
-         model=model_to_use,
-         messages = st.session_state.messages,
-         stream=True)
-     
-if prompt := st.chat_input('What is up?'):
-    response= st.write_stream(stream)
-    st.session_statemessages.append({'role': 'user', 'content': response})
-
-
+    st.session_state.messages.append({'role': 'user', 'content': prompt})
+    
+    with st.chat_message('user'):
+        st.markdown(prompt)
+    
+    client = st.session_state.client
+    stream = client.chat.completions.create(
+        model=model_to_use,
+        messages=st.session_state.messages,
+        stream=True
+    )
+    
+    with st.chat_message('assistant'):
+        response = st.write_stream(stream)
+    
+    st.session_state.messages.append({'role': 'assistant', 'content': response})
 #going to make a function to write the buffer 
 
 def trim_msgs(messages, max_user_messages=2):
