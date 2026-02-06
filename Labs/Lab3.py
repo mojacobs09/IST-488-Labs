@@ -30,7 +30,7 @@ for msg in st.session_state.messages:
         chat_msg = st.chat_message(msg['role'])
         chat_msg.write(msg['content'])
 
-if prompt := st.chat.input('What is up?'):
+if prompt := st.chat_input('What is up?'):
     st.session_statemessages.append({'role': 'user', 'content': prompt})
 
 with st.chat_message('user'):
