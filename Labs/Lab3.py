@@ -42,9 +42,9 @@ stream = client.chat.completions.create(
          messages = st.session_state.messages,
          stream=True)
      
-with st.chat_message('assistant'):
-         response = st.write_stream(stream)
-st.session_state.messages.append({'role': 'user', 'content': prompt})
+if prompt := st.chat_input('What is up?'):
+    response= st.write_stream(stream)
+    st.session_statemessages.append({'role': 'user', 'content': response})
 
 
 #going to make a function to write the buffer 
