@@ -68,7 +68,7 @@ def load_pdfs_to_collection(folder_path, collection):
 #checking if collecton is empty
 
 if collection.count() == 0:
-    loaded = load_pdfs_to_collection('./Lab-04-Data/', collection)
+    loaded = load_pdfs_to_collection('../Labs-04-Data/', collection)
 
 
 #creating the vector database function 
