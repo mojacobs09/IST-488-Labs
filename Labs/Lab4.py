@@ -50,9 +50,26 @@ def add_to_collection(collection, text, file_name):
 
 # POPULATING THE COLLECTION WITH PDFS
 def load_pdfs_to_collection(folder_path, collection):
+    import os
+    
+    # Show current working directory
+    st.write(f"Current working directory: {os.getcwd()}")
+    
+    # Show what Path thinks the folder is
+    path_obj = Path(folder_path)
+    st.write(f"Looking for folder: {path_obj}")
+    st.write(f"Absolute path: {path_obj.resolve()}")
+    st.write(f"Does folder exist? {path_obj.exists()}")
+    
+    # Try to list what's in the folder
+    if path_obj.exists():
+        all_files = list(path_obj.iterdir())
+        st.write(f"All items in folder: {[f.name for f in all_files]}")
+    
+    # Now try the glob
     pdf_files = list(Path(folder_path).glob('*.pdf'))
-    st.write(f"Looking in: {folder_path}")
     st.write(f"Found {len(pdf_files)} PDF files")
+    st.write(f"PDF files: {[f.name for f in pdf_files]}")
     
     for pdf_file in pdf_files:
         text = extract_text_from_pdf(pdf_file)
