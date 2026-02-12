@@ -123,7 +123,9 @@ else:
     st.write("Labs folder does NOT exist!")
 
 st.write("=== END DEBUG ===")
-st.write(""
+st.write("")
+         
+
 st.write('''
 **How this chatbot works:**
 - This chatbot uses RAG (Retrieval Augmented Generation)
