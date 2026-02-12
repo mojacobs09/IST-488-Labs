@@ -50,32 +50,12 @@ def add_to_collection(collection, text, file_name):
 
 # POPULATING THE COLLECTION WITH PDFS
 def load_pdfs_to_collection(folder_path, collection):
-    import os
-    
-    # Show current working directory
-    st.write(f"Current working directory: {os.getcwd()}")
-    
-    # Show what Path thinks the folder is
-    path_obj = Path(folder_path)
-    st.write(f"Looking for folder: {path_obj}")
-    st.write(f"Absolute path: {path_obj.resolve()}")
-    st.write(f"Does folder exist? {path_obj.exists()}")
-    
-    # Try to list what's in the folder
-    if path_obj.exists():
-        all_files = list(path_obj.iterdir())
-        st.write(f"All items in folder: {[f.name for f in all_files]}")
-    
-    # Now try the glob
     pdf_files = list(Path(folder_path).glob('*.pdf'))
-    st.write(f"Found {len(pdf_files)} PDF files")
-    st.write(f"PDF files: {[f.name for f in pdf_files]}")
     
     for pdf_file in pdf_files:
         text = extract_text_from_pdf(pdf_file)
         if text:
             add_to_collection(collection, text, pdf_file.name)
-            st.write(f"Added: {pdf_file.name}")
     return True
 
 # creating the vector database function 
@@ -87,7 +67,6 @@ def create_vector_db():
     # checking if collection is empty
     if collection.count() == 0:
         with st.spinner('Loading PDFs into collection...'):
-            # Use this path since Lab-04-Data is in the same folder as Lab4.py
             loaded = load_pdfs_to_collection('./Labs/Lab-04-Data/', collection)
             st.success(f'Loaded {collection.count()} documents!')
     
@@ -97,65 +76,96 @@ def create_vector_db():
 if 'Lab4_VectorDB' not in st.session_state:
     st.session_state.Lab4_VectorDB = create_vector_db()
 
+# Buffer function - keeps last 6 messages + system prompt
+def trim_messages(messages, max_messages=6):
+    """Keep system prompt + last 6 messages (3 user-assistant exchanges)"""
+    system_msgs = [msg for msg in messages if msg['role'] == 'system']
+    other_msgs = [msg for msg in messages if msg['role'] != 'system']
+    
+    trimmed = other_msgs[-max_messages:] if len(other_msgs) > max_messages else other_msgs
+    
+    return system_msgs + trimmed
+
 # MAIN APP
 st.title('Lab 4: Chatbot using RAG')
-# MEGA DEBUG - See entire file structure
-import os
-st.write("=== DEBUGGING FILE STRUCTURE ===")
-st.write(f"Working directory: {os.getcwd()}")
-st.write("")
-
-st.write("Root level files:")
-st.write(os.listdir('.'))
-st.write("")
-
-if os.path.exists('./Labs'):
-    st.write("Inside Labs folder:")
-    st.write(os.listdir('./Labs'))
-    st.write("")
-    
-    if os.path.exists('./Labs/Lab-04-Data'):
-        st.write("Inside Labs/Lab-04-Data folder:")
-        st.write(os.listdir('./Labs/Lab-04-Data'))
-    else:
-        st.write("Labs/Lab-04-Data does NOT exist!")
-else:
-    st.write("Labs folder does NOT exist!")
-
-st.write("=== END DEBUG ===")
-st.write("")
-         
 
 st.write('''
 **How this chatbot works:**
-- This chatbot uses RAG (Retrieval Augmented Generation)
-- Enter a topic to research 
-- The chatbot will use retrieved documents to answer your questions
-- **Conversation Memory:** This bot will use a conversation buffer for six messages
+- This chatbot uses RAG (Retrieval Augmented Generation) with 7 PDF documents
+- Ask questions and the bot will search relevant documents to provide accurate answers
+- The bot will clearly indicate when it's using information from the documents
+- **Conversation Memory:** This bot uses a buffer of 6 messages (3 user-assistant exchanges)
 ''')
 
-# sidebar to test the vector database 
-st.sidebar.subheader('Test Vector Database')
-test_topic = st.sidebar.text_input('Test Topic', placeholder='e.g., Generative AI, Text Mining...')
+# Initialize messages with system prompt
+if 'messages' not in st.session_state:
+    st.session_state['messages'] = [
+        {'role': 'system', 'content': '''You are a helpful assistant that answers questions using provided context from PDF documents.
 
-if test_topic:
+When answering questions:
+- If you find relevant information in the provided documents, start your answer with "Based on the documents..." or "According to [document name]..."
+- Clearly cite which document(s) you're using in your response
+- If the documents don't contain relevant information, say "I don't have information about that in the available documents" and provide a general answer if appropriate
+- After answering, ask "Do you want more info?" If yes, provide more details. If no, ask "What else can I help you with?"'''},
+        {'role': 'assistant', 'content': 'How can I help you? Ask me anything about the documents!'}
+    ]
+
+# Display chat messages
+for msg in st.session_state.messages:
+    if msg['role'] != 'system':
+        chat_msg = st.chat_message(msg['role'])
+        chat_msg.write(msg['content'])
+
+# Chat input
+if prompt := st.chat_input('What is up?'):
+    st.session_state.messages.append({'role': 'user', 'content': prompt})
+    
+    with st.chat_message('user'):
+        st.markdown(prompt)
+    
+    # Get relevant context from vector database
     client = st.session_state.openai_client
-    response = client.embeddings.create(
-        input=test_topic,
+    embedding_response = client.embeddings.create(
+        input=prompt,
         model='text-embedding-3-small'
     )
-    query_embedding = response.data[0].embedding
+    query_embedding = embedding_response.data[0].embedding
     
-    # text related to the question prompt
+    # Query the vector database
     results = st.session_state.Lab4_VectorDB.query(
         query_embeddings=[query_embedding],
         n_results=3
     )
     
-    # display the results
-    st.sidebar.subheader(f'Top Results for: {test_topic}')
-    for i in range(len(results['ids'][0])):
-        doc_id = results['ids'][0][i]
-        st.sidebar.write(f'**{i+1}. {doc_id}**')
-else: 
-    st.info('Enter a topic in the sidebar to search the collection')
+    # Build context from retrieved documents
+    context = ""
+    for i in range(len(results['documents'][0])):
+        doc_content = results['documents'][0][i][:2000]
+        doc_name = results['ids'][0][i]
+        context += f"\n\n--- Document: {doc_name} ---\n{doc_content}\n"
+    
+    # Prepare messages with context
+    messages_to_send = trim_messages(st.session_state.messages, max_messages=6)
+    
+    # Add context to system message for this request
+    messages_with_context = []
+    for msg in messages_to_send:
+        if msg['role'] == 'system':
+            messages_with_context.append({
+                'role': 'system',
+                'content': msg['content'] + f"\n\nHere are the relevant documents for context:\n{context}"
+            })
+        else:
+            messages_with_context.append(msg)
+    
+    # Get response from OpenAI
+    stream = client.chat.completions.create(
+        model='gpt-5-2025-08-07',
+        messages=messages_with_context,
+        stream=True
+    )
+    
+    with st.chat_message('assistant'):
+        response = st.write_stream(stream)
+    
+    st.session_state.messages.append({'role': 'assistant', 'content': response})
