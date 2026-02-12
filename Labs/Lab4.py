@@ -17,7 +17,7 @@ collection = chroma_client.get_or_create_collection('Lab4Collection')
 
 #creating the open AI Client
 if 'openai_client' not in st.session_state:
-    st.session_state.openai_client = OpenAI(api_key=st.secrets.OPEN_AI_KEY)
+    st.session_state.openai_client = OpenAI(api_key=st.secrets.OPENAI_API_KEY)
 
  #EXTRACTING text from THE PDF 
 def extract_text_from_pdf(pdf_path):
