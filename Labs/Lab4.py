@@ -5,21 +5,15 @@ import chromadb
 from pathlib import Path
 from PyPDF2 import PdfReader
 
-# fix for using chromadb on strea,lit
-
+# fix for using chromadb on streamlit
 __import__('pysqlite3')
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
-# create Chroma Client
-chroma_client = chromadb.PersistentClient(path='./ChromaDB_for_Lab')
-collection = chroma_client.get_or_create_collection('Lab4Collection')
-
-
-#creating the open AI Client
+# creating the OpenAI Client
 if 'openai_client' not in st.session_state:
     st.session_state.openai_client = OpenAI(api_key=st.secrets.OPENAI_API_KEY)
 
- #EXTRACTING text from THE PDF 
+# EXTRACTING text from THE PDF 
 def extract_text_from_pdf(pdf_path):
     '''
     Extracts texts from a PDF file with error handling
@@ -33,45 +27,41 @@ def extract_text_from_pdf(pdf_path):
     except Exception as e:
         st.error(f"Error reading PDF: {e}")
         return ""
-    
-#collection = chromaDB collection, already established 
+
+# collection = chromaDB collection, already established 
 # text = extracted text from PDF files
 # embeddings inserted into collection from OpenAI
-
 def add_to_collection(collection, text, file_name):
-    #creates an embedding
+    # creates an embedding
     client = st.session_state.openai_client
     response = client.embeddings.create(
         input=text,
         model='text-embedding-3-small' 
     )
-
     embedding = response.data[0].embedding
-    #add embedding and document to ChromaDB
+    
+    # add embedding and document to ChromaDB
     collection.add(
         documents=[text],
-        ids=file_name,
-        embeddings=[embedding]
+        ids=[file_name],
+        embeddings=[embedding],
+        metadatas=[{"filename": file_name}]
     )
 
-#POPULATING THE TEXT WITH PDFS
+# POPULATING THE COLLECTION WITH PDFS
 def load_pdfs_to_collection(folder_path, collection):
-
-    pdf_files = Path(folder_path).glob('*.pdf')
-
+    pdf_files = list(Path(folder_path).glob('*.pdf'))
+    st.write(f"Looking in: {folder_path}")
+    st.write(f"Found {len(pdf_files)} PDF files")
+    
     for pdf_file in pdf_files:
         text = extract_text_from_pdf(pdf_file)
-        add_to_collection(collection, text, pdf_file.name)
-
+        if text:
+            add_to_collection(collection, text, pdf_file.name)
+            st.write(f"Added: {pdf_file.name}")
     return True
- 
-#checking if collecton is empty
 
-if collection.count() == 0:
-    loaded = load_pdfs_to_collection('../Labs-04-Data/', collection)
-
-
-#creating the vector database function 
+# creating the vector database function 
 def create_vector_db():
     # create Chroma Client
     chroma_client = chromadb.PersistentClient(path='./ChromaDB_for_Lab')
@@ -80,17 +70,17 @@ def create_vector_db():
     # checking if collection is empty
     if collection.count() == 0:
         with st.spinner('Loading PDFs into collection...'):
+            # Use this path since Lab-04-Data is in the same folder as Lab4.py
             loaded = load_pdfs_to_collection('./Lab-04-Data/', collection)
             st.success(f'Loaded {collection.count()} documents!')
     
     return collection
 
+# Only create the ChromaDB once - store in session_state
 if 'Lab4_VectorDB' not in st.session_state:
     st.session_state.Lab4_VectorDB = create_vector_db()
 
-
 # MAIN APP
-
 st.title('Lab 4: Chatbot using RAG')
 
 st.write('''
@@ -98,11 +88,10 @@ st.write('''
 - This chatbot uses RAG (Retrieval Augmented Generation)
 - Enter a topic to research 
 - The chatbot will use retrieved documents to answer your questions
-- **Conversation Memory:** This bot will use a conversation bufer for six messages
+- **Conversation Memory:** This bot will use a conversation buffer for six messages
 ''')
 
-#side bar to test the vector bedding 
-
+# sidebar to test the vector database 
 st.sidebar.subheader('Test Vector Database')
 test_topic = st.sidebar.text_input('Test Topic', placeholder='e.g., Generative AI, Text Mining...')
 
