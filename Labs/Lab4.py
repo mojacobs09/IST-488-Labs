@@ -11,7 +11,7 @@ __import__('pysqlite3')
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
 # create Chroma Client
-chroma_client = chromadb.PersistantClient(path='./ChromaDB_for_Lab')
+chroma_client = chromadb.PersistentClient(path='./ChromaDB_for_Lab')
 collection = chroma_client.get_or_create_collection('Lab4Collection')
 
 
