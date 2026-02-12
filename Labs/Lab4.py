@@ -99,7 +99,31 @@ if 'Lab4_VectorDB' not in st.session_state:
 
 # MAIN APP
 st.title('Lab 4: Chatbot using RAG')
+# MEGA DEBUG - See entire file structure
+import os
+st.write("=== DEBUGGING FILE STRUCTURE ===")
+st.write(f"Working directory: {os.getcwd()}")
+st.write("")
 
+st.write("Root level files:")
+st.write(os.listdir('.'))
+st.write("")
+
+if os.path.exists('./Labs'):
+    st.write("Inside Labs folder:")
+    st.write(os.listdir('./Labs'))
+    st.write("")
+    
+    if os.path.exists('./Labs/Lab-04-Data'):
+        st.write("Inside Labs/Lab-04-Data folder:")
+        st.write(os.listdir('./Labs/Lab-04-Data'))
+    else:
+        st.write("Labs/Lab-04-Data does NOT exist!")
+else:
+    st.write("Labs folder does NOT exist!")
+
+st.write("=== END DEBUG ===")
+st.write(""
 st.write('''
 **How this chatbot works:**
 - This chatbot uses RAG (Retrieval Augmented Generation)
