@@ -88,7 +88,7 @@ def create_vector_db():
     if collection.count() == 0:
         with st.spinner('Loading PDFs into collection...'):
             # Use this path since Lab-04-Data is in the same folder as Lab4.py
-            loaded = load_pdfs_to_collection('./Lab-04-Data/', collection)
+            loaded = load_pdfs_to_collection('./Labs/Lab-04-Data/', collection)
             st.success(f'Loaded {collection.count()} documents!')
     
     return collection
