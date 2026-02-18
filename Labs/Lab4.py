@@ -9,6 +9,8 @@ from PyPDF2 import PdfReader
 __import__('pysqlite3')
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
 
+
+
 # creating the OpenAI Client
 if 'openai_client' not in st.session_state:
     st.session_state.openai_client = OpenAI(api_key=st.secrets.OPENAI_API_KEY)
