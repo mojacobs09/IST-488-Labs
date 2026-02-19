@@ -13,7 +13,7 @@ from openai import OpenAI
 
 #function to get the weather of everything
 
-def get_current_weather(location, api_key, units='imperial'):
+def get_current_weather(location, units='imperial'):
   url = (f'https://api.openweathermap.org/data/2.5/weather?q={location}&appid={api_key}&units={units}')
   response = requests.get(url)
   if response.status_code == 401:
