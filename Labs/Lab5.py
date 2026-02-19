@@ -35,8 +35,9 @@ def get_current_weather(location, units='imperial'):
       'feels_like': round(feels_like, 2),
       'temp_min': round(temp_min, 2),
       'temp_max': round(temp_max, 2),
-      'humidity': round(humidity, 2)
-      }
+      'humidity': round(humidity, 2),
+      'description': data['weather'][0]['description']
+    }
 
 weather_api_key = st.secrets['WEATHER_API_KEY']
 
