@@ -2,7 +2,7 @@ import streamlit as st
 from openai import OpenAI
 from pydantic import BaseModel
 
-# ── Page config ──────────────────────────────────────────────────────────────
+# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(page_title="Research Agent", page_icon="🔍", layout="centered")
 
 # ── OpenAI client ─────────────────────────────────────────────────────────────
@@ -18,9 +18,9 @@ class ResearchSummary(BaseModel):
 if "last_response_id" not in st.session_state:
     st.session_state.last_response_id = None
 if "conversation" not in st.session_state:
-    st.session_state.conversation = []   # list of {"role": str, "content": str}
+    st.session_state.conversation = []  # list of {"role": str, "content": str}
 
-# ── Sidebar controls ─────────────────────────────────────────────────────────
+# ── Sidebar controls ──────────────────────────────────────────────────────────
 with st.sidebar:
     st.header("⚙️ Agent Settings")
     structured_mode = st.checkbox("Return structured summary", value=False)
@@ -30,124 +30,110 @@ with st.sidebar:
         st.session_state.conversation = []
         st.rerun()
 
-# ── Title & description ───────────────────────────────────────────────────────
+# ── Title ─────────────────────────────────────────────────────────────────────
 st.title("🔍 Research Agent")
 st.caption("Powered by the OpenAI Responses API · Web search enabled 🌐")
 
-# ── Helper: display conversation history ─────────────────────────────────────
-def render_history():
-    for msg in st.session_state.conversation:
-        with st.chat_message(msg["role"]):
-            st.markdown(msg["content"])
-
-render_history()
-
-# ── Helper: make a Responses API call ────────────────────────────────────────
-def call_responses_api(user_input: str, previous_id: str | None):
-    """Calls client.responses.create() or .parse() based on sidebar toggles."""
-
-    base_kwargs = dict(
-        model="gpt-4o",
-        instructions=(
-            "You are a helpful research assistant. "
-            "Always cite your sources when using web search."
-        ),
-        input=user_input,
-        tools=[{"type": "web_search_preview"}],
-        previous_response_id=previous_id,
-    )
-
-    # ── Part D: structured output ────────────────────────────────────────────
-    if structured_mode:
-        response = client.responses.parse(
-            **base_kwargs,
-            text_format=ResearchSummary,
-        )
-        summary: ResearchSummary = response.output_parsed
-
-        # Build a markdown string for history storage
-        facts_md = "\n".join(f"- {f}" for f in summary.key_facts)
-        display_text = (
-            f"**Answer:** {summary.main_answer}\n\n"
-            f"**Key facts:**\n{facts_md}\n\n"
-            f"*Source hint: {summary.source_hint}*"
-        )
-        return response, display_text, summary
-
-    # ── Part E: streaming ────────────────────────────────────────────────────
-    if streaming_mode:
-        return "stream", None, None   # handled separately below
-
-    # ── Default: plain create ────────────────────────────────────────────────
-    response = client.responses.create(**base_kwargs)
-    return response, response.output_text, None
-
-
-# ── Streaming helper ──────────────────────────────────────────────────────────
-def stream_response(user_input: str, previous_id: str | None):
-    """Streams the response and returns (response_id, full_text)."""
-    with client.responses.stream(
-        model="gpt-4o",
-        instructions=(
-            "You are a helpful research assistant. "
-            "Always cite your sources when using web search."
-        ),
-        input=user_input,
-        tools=[{"type": "web_search_preview"}],
-        previous_response_id=previous_id,
-    ) as stream:
-        placeholder = st.empty()
-        collected = ""
-        for event in stream:
-            # text_delta events carry incremental text
-            if hasattr(event, "delta") and hasattr(event.delta, "text"):
-                collected += event.delta.text
-                placeholder.markdown(collected + "▌")
-        placeholder.markdown(collected)
-        final = stream.get_final_response()
-        return final.id, collected
-
+# ── Render stored conversation history ───────────────────────────────────────
+for msg in st.session_state.conversation:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
 # ── Chat input ────────────────────────────────────────────────────────────────
-user_input = st.chat_input(
-    "Ask a question…" if not st.session_state.last_response_id
-    else "Ask a follow-up question…"
+placeholder_text = (
+    "Ask a follow-up question…"
+    if st.session_state.last_response_id
+    else "Ask a question…"
 )
+user_input = st.chat_input(placeholder_text)
 
 if user_input:
-    # Show user message immediately
+    # 1. Show & store user message
     with st.chat_message("user"):
         st.markdown(user_input)
     st.session_state.conversation.append({"role": "user", "content": user_input})
 
     previous_id = st.session_state.last_response_id
 
+    # 2. Call the API and show assistant response
     with st.chat_message("assistant"):
 
-        # ── Streaming branch ─────────────────────────────────────────────────
+        # ── Streaming (non-structured) ────────────────────────────────────────
         if streaming_mode and not structured_mode:
-            response_id, display_text = stream_response(user_input, previous_id)
-            st.session_state.last_response_id = response_id
+            try:
+                with client.responses.stream(
+                    model="gpt-4o",
+                    instructions="You are a helpful research assistant. Always cite your sources when using web search.",
+                    input=user_input,
+                    tools=[{"type": "web_search_preview"}],
+                    previous_response_id=previous_id,
+                ) as stream:
+                    box = st.empty()
+                    collected = ""
+                    for event in stream:
+                        if hasattr(event, "delta") and hasattr(event.delta, "text"):
+                            collected += event.delta.text
+                            box.markdown(collected + "▌")
+                    box.markdown(collected)
+                    final = stream.get_final_response()
 
-        # ── Non-streaming branch ─────────────────────────────────────────────
-        else:
-            with st.spinner("Thinking…"):
-                response, display_text, summary = call_responses_api(
-                    user_input, previous_id
-                )
+                st.session_state.last_response_id = final.id
+                st.session_state.conversation.append({"role": "assistant", "content": collected})
 
-            st.session_state.last_response_id = response.id
+            except Exception as e:
+                st.error(f"Streaming error: {e}")
 
-            if structured_mode and summary:
-                # Render structured fields nicely
+        # ── Structured output ─────────────────────────────────────────────────
+        elif structured_mode:
+            try:
+                with st.spinner("Thinking…"):
+                    response = client.responses.parse(
+                        model="gpt-4o",
+                        instructions="You are a helpful research assistant. Always cite your sources when using web search.",
+                        input=user_input,
+                        tools=[{"type": "web_search_preview"}],
+                        previous_response_id=previous_id,
+                        text_format=ResearchSummary,
+                    )
+
+                summary: ResearchSummary = response.output_parsed
+
                 st.markdown(f"**Answer:** {summary.main_answer}")
                 st.markdown("**Key facts:**")
                 for fact in summary.key_facts:
                     st.markdown(f"- {fact}")
                 st.caption(f"Source hint: {summary.source_hint}")
-            else:
-                st.markdown(display_text)
 
-    st.session_state.conversation.append(
-        {"role": "assistant", "content": display_text or ""}
-    )
+                # Build a plain text version to store in history
+                facts_md = "\n".join(f"- {f}" for f in summary.key_facts)
+                display_text = (
+                    f"**Answer:** {summary.main_answer}\n\n"
+                    f"**Key facts:**\n{facts_md}\n\n"
+                    f"*Source hint: {summary.source_hint}*"
+                )
+
+                st.session_state.last_response_id = response.id
+                st.session_state.conversation.append({"role": "assistant", "content": display_text})
+
+            except Exception as e:
+                st.error(f"Structured output error: {e}")
+
+        # ── Plain response ────────────────────────────────────────────────────
+        else:
+            try:
+                with st.spinner("Thinking…"):
+                    response = client.responses.create(
+                        model="gpt-4o",
+                        instructions="You are a helpful research assistant. Always cite your sources when using web search.",
+                        input=user_input,
+                        tools=[{"type": "web_search_preview"}],
+                        previous_response_id=previous_id,
+                    )
+
+                st.markdown(response.output_text)
+
+                st.session_state.last_response_id = response.id
+                st.session_state.conversation.append({"role": "assistant", "content": response.output_text})
+
+            except Exception as e:
+                st.error(f"API error: {e}")
