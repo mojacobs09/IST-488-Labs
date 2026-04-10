@@ -46,8 +46,8 @@ if st.button("✨ Generate Captions from URL", key="url_btn"):
         with st.spinner("Analyzing image..."):
             try:
                 url_response = client.chat.completions.create(
-                    model="gpt-4.1-mini",
-                    max_tokens=1024,
+                    model="gpt-5-2025-08-07",
+                    max_completion_tokens=1024,
                     messages=[
                         {
                             "role": "user",
@@ -98,7 +98,7 @@ if st.button("✨ Generate Captions from File", key="upload_btn"):
 
                 upload_response = client.chat.completions.create(
                     model="gpt-5-2025-08-07",
-                    max_tokens=1024,
+                    max_completion_tokens=1024,
                     messages=[
                         {
                             "role": "user",
