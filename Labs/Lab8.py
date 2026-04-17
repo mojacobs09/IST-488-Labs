@@ -7,8 +7,8 @@ from openai import OpenAI
 # CONFIG
 # ─────────────────────────────────────────────
 MEMORIES_FILE = "memories.json"
-MAIN_MODEL = "GPT-5.4"
-EXTRACT_MODEL = "GPT-5.4 mini"
+MAIN_MODEL = "gpt-4o-mini"
+EXTRACT_MODEL = "gpt-4o-mini"
 
 client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
