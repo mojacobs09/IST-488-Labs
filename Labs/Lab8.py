@@ -2,21 +2,15 @@ import streamlit as st
 import json
 import os
 from openai import OpenAI
-import anthropic
 
 # ─────────────────────────────────────────────
 # CONFIG
 # ─────────────────────────────────────────────
 MEMORIES_FILE = "memories.json"
+MAIN_MODEL = "gpt-4o-mini"
+EXTRACT_MODEL = "gpt-4o-mini"
 
-OPENAI_MAIN_MODEL = "gpt-4o-mini"
-OPENAI_EXTRACT_MODEL = "gpt-4o-mini"
-
-ANTHROPIC_MAIN_MODEL = "claude-haiku-4-5-20251001"
-ANTHROPIC_EXTRACT_MODEL = "claude-haiku-4-5-20251001"
-
-openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-anthropic_client = anthropic.Anthropic(api_key=st.secrets["CLAUDE_API_KEY"])
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 # ─────────────────────────────────────────────
 # PART B: MEMORY SYSTEM
@@ -36,7 +30,7 @@ def save_memories(memories: list[str]) -> None:
         json.dump(memories, f, indent=2)
 
 
-def extract_new_memories(user_msg: str, assistant_msg: str, existing_memories: list[str], provider: str) -> list[str]:
+def extract_new_memories(user_msg: str, assistant_msg: str, existing_memories: list[str]) -> list[str]:
     """
     Use a cheap LLM call to extract new facts about the user from the latest exchange.
     Returns a list of new memory strings (may be empty).
@@ -57,27 +51,19 @@ Do not include any explanation, markdown, or code fences — just raw JSON.
 
 Example output: ["User's name is Alex", "User studies Computer Science", "User likes sushi"]"""
 
-    try:
-        if provider == "OpenAI":
-            response = openai_client.chat.completions.create(
-                model=OPENAI_EXTRACT_MODEL,
-                messages=[{"role": "user", "content": extraction_prompt}],
-                temperature=0,
-                max_tokens=300,
-            )
-            raw = response.choices[0].message.content.strip()
-        else:
-            response = anthropic_client.messages.create(
-                model=ANTHROPIC_EXTRACT_MODEL,
-                max_tokens=300,
-                messages=[{"role": "user", "content": extraction_prompt}],
-            )
-            raw = response.content[0].text.strip()
+    response = client.chat.completions.create(
+        model=EXTRACT_MODEL,
+        messages=[{"role": "user", "content": extraction_prompt}],
+        temperature=0,
+        max_tokens=300,
+    )
 
+    raw = response.choices[0].message.content.strip()
+    try:
         new_facts = json.loads(raw)
         if isinstance(new_facts, list):
             return [str(f) for f in new_facts]
-    except Exception:
+    except (json.JSONDecodeError, ValueError):
         pass
     return []
 
@@ -101,26 +87,17 @@ def build_system_prompt(memories: list[str]) -> str:
     return base
 
 
-def chat(messages: list[dict], provider: str) -> str:
+def chat(messages: list[dict]) -> str:
     """Send messages to the LLM and return the assistant reply."""
     memories = load_memories()
     system_prompt = build_system_prompt(memories)
 
-    if provider == "OpenAI":
-        response = openai_client.chat.completions.create(
-            model=OPENAI_MAIN_MODEL,
-            messages=[{"role": "system", "content": system_prompt}] + messages,
-            temperature=0.7,
-        )
-        return response.choices[0].message.content
-    else:
-        response = anthropic_client.messages.create(
-            model=ANTHROPIC_MAIN_MODEL,
-            max_tokens=1000,
-            system=system_prompt,
-            messages=messages,
-        )
-        return response.content[0].text
+    response = client.chat.completions.create(
+        model=MAIN_MODEL,
+        messages=[{"role": "system", "content": system_prompt}] + messages,
+        temperature=0.7,
+    )
+    return response.choices[0].message.content
 
 
 # ─────────────────────────────────────────────
@@ -131,20 +108,8 @@ st.set_page_config(page_title="Memory Chatbot", page_icon="🧠", layout="wide")
 st.title("🧠 Memory Chatbot")
 st.caption("I remember you — even after you leave.")
 
-# ── Sidebar ──────────────────────────────────
+# ── Sidebar: memory display ──────────────────
 with st.sidebar:
-    st.header("⚙️ Settings")
-
-    provider = st.radio(
-        "Choose your LLM provider:",
-        ["OpenAI", "Anthropic"],
-        horizontal=True,
-    )
-
-    active_model = OPENAI_MAIN_MODEL if provider == "OpenAI" else ANTHROPIC_MAIN_MODEL
-    st.caption(f"Model: `{active_model}`")
-
-    st.divider()
     st.header("🗂️ Long-Term Memories")
     memories = load_memories()
 
@@ -161,18 +126,12 @@ with st.sidebar:
         st.success("Memories cleared!")
         st.rerun()
 
+    st.divider()
+    st.caption(f"Model: `{MAIN_MODEL}`  |  Extractor: `{EXTRACT_MODEL}`")
+
 # ── Session state: chat history ──────────────
 if "messages" not in st.session_state:
     st.session_state.messages = []
-
-# Reset chat history when provider switches
-if "active_provider" not in st.session_state:
-    st.session_state.active_provider = provider
-
-if st.session_state.active_provider != provider:
-    st.session_state.messages = []
-    st.session_state.active_provider = provider
-    st.rerun()
 
 # Display chat history
 for msg in st.session_state.messages:
@@ -181,22 +140,24 @@ for msg in st.session_state.messages:
 
 # ── Chat input ───────────────────────────────
 if user_input := st.chat_input("Say something..."):
+    # Show user message
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
+    # Get assistant response
     with st.chat_message("assistant"):
         with st.spinner("Thinking..."):
-            reply = chat(st.session_state.messages, provider)
+            reply = chat(st.session_state.messages)
         st.markdown(reply)
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
     # Extract and save new memories
     current_memories = load_memories()
-    new_facts = extract_new_memories(user_input, reply, current_memories, provider)
+    new_facts = extract_new_memories(user_input, reply, current_memories)
 
     if new_facts:
         updated = current_memories + new_facts
         save_memories(updated)
-        st.rerun()
+        st.rerun()  # Refresh sidebar to show new memories
