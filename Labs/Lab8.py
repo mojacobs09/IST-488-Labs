@@ -16,7 +16,7 @@ ANTHROPIC_MAIN_MODEL = "claude-haiku-4-5-20251001"
 ANTHROPIC_EXTRACT_MODEL = "claude-haiku-4-5-20251001"
 
 openai_client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
-anthropic_client = anthropic.Anthropic(api_key=st.secrets["ANTHROPIC_API_KEY"])
+anthropic_client = anthropic.Anthropic(api_key=st.secrets["CLAUDE_API_KEY"])
 
 # ─────────────────────────────────────────────
 # PART B: MEMORY SYSTEM
